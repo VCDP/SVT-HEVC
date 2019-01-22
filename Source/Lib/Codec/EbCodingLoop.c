@@ -24,7 +24,7 @@
 #include "emmintrin.h"
 
 //#define DEBUG_REF_INFO
-#define DUMP_RECON
+//#define DUMP_RECON
 #ifdef DUMP_RECON
 static void dump_buf_desc_to_file(EbPictureBufferDesc_t* reconBuffer, const char* filename, int POC)
 {
@@ -3176,13 +3176,11 @@ EB_EXTERN void EncodePass(
     EB_BOOL enableStrongIntraSmoothing = sequenceControlSetPtr->enableStrongIntraSmoothing;
     CodingUnit_t **codedLeafArrayPtr = lcuPtr->codedLeafArrayPtr;
 
-    // This flag needs to be set true when SAO is enabled for Non reference pictures so that SAO uses filtered samples
     EB_BOOL dlfEnableFlag = (EB_BOOL)(!sequenceControlSetPtr->staticConfig.disableDlfFlag && 
-        ///*(pictureControlSetPtr->ParentPcsPtr->isUsedAsReferenceFlag) kelvin*/1) ||
-        (pictureControlSetPtr->ParentPcsPtr->isUsedAsReferenceFlag)) ||
-        sequenceControlSetPtr->staticConfig.reconEnabled;
+        (pictureControlSetPtr->ParentPcsPtr->isUsedAsReferenceFlag));
 
     dlfEnableFlag = contextPtr->allowEncDecMismatch ? EB_FALSE : dlfEnableFlag;
+    pictureControlSetPtr->sliceDlfDisableFlag = !dlfEnableFlag;
 
     const EB_BOOL isIntraLCU = contextPtr->mdContext->limitIntra ? isIntraPresent(lcuPtr) : EB_TRUE;
 
@@ -4626,16 +4624,23 @@ EB_EXTERN void EncodePass(
 
 
             if (dlfEnableFlag) {
+                // TODO: Jing:
+                // Double check 422/444 for availableCoeff here
                 // Assign the LCU-level QP  
                 if (cuPtr->predictionModeFlag == INTRA_MODE && puPtr->intraLumaMode == EB_INTRA_MODE_4x4) {
-					availableCoeff = (
-						contextPtr->cuPtr->transformUnitArray[1].lumaCbf ||
-						contextPtr->cuPtr->transformUnitArray[2].lumaCbf ||
-						contextPtr->cuPtr->transformUnitArray[3].lumaCbf ||
-						contextPtr->cuPtr->transformUnitArray[4].lumaCbf ||
+                    availableCoeff = (
+                        contextPtr->cuPtr->transformUnitArray[1].lumaCbf ||
+                        contextPtr->cuPtr->transformUnitArray[2].lumaCbf ||
+                        contextPtr->cuPtr->transformUnitArray[3].lumaCbf ||
+                        contextPtr->cuPtr->transformUnitArray[4].lumaCbf ||
                         contextPtr->cuPtr->transformUnitArray[1].crCbf ||
-                        contextPtr->cuPtr->transformUnitArray[1].cbCbf) ? EB_TRUE : EB_FALSE;
-
+                        contextPtr->cuPtr->transformUnitArray[1].cbCbf ||
+                        contextPtr->cuPtr->transformUnitArray[2].crCbf ||
+                        contextPtr->cuPtr->transformUnitArray[2].cbCbf ||
+                        contextPtr->cuPtr->transformUnitArray[3].crCbf ||
+                        contextPtr->cuPtr->transformUnitArray[3].cbCbf ||
+                        contextPtr->cuPtr->transformUnitArray[4].crCbf || // 422 case will use 3rd 4x4 for the 2nd chroma
+                        contextPtr->cuPtr->transformUnitArray[4].cbCbf) ? EB_TRUE : EB_FALSE;
                 } else {
                     availableCoeff = (cuPtr->predictionModeFlag == INTER_MODE) ? (EB_BOOL)cuPtr->rootCbf :
                         (cuPtr->transformUnitArray[cuStats->size == MAX_LCU_SIZE ? 1 : 0].lumaCbf ||
@@ -4824,13 +4829,12 @@ EB_EXTERN void EncodePass(
         printf("-----Dump recon frame POC %u----\n", pictureControlSetPtr->pictureNumber);
         char filename[256];
         sprintf(filename, "recon_poc_%d.yuv", pictureControlSetPtr->pictureNumber);
-        dump_buf_desc_to_file(reconBuffer, "final_recon.yuv", pictureControlSetPtr->pictureNumber);
+        dump_buf_desc_to_file(reconBuffer, "final_recon_without_SAO.yuv", pictureControlSetPtr->pictureNumber);
     }
 #endif
 
     // SAO Parameter Generation 
     if (enableSaoFlag) {
-        assert(0);
 
         EB_S16 lcuDeltaQp = (EB_S16)(lcuPtr->qp - pictureControlSetPtr->ParentPcsPtr->averageQp);
 

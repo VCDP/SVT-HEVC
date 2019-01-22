@@ -175,9 +175,9 @@ EB_ERRORTYPE CopyConfigurationParameters(
     callbackData->ebEncParameters.reconEnabled      = config->reconFile ? 1 : 0;
 
 //    callbackData->ebEncParameters.asmType= 0;
-    callbackData->ebEncParameters.disableDlfFlag = 1;
+    callbackData->ebEncParameters.disableDlfFlag = 0;//1;
     callbackData->ebEncParameters.enableSaoFlag = 0;
-    callbackData->ebEncParameters.qp=30;
+    callbackData->ebEncParameters.qp=20;
     callbackData->ebEncParameters.rateControlMode=0;
     callbackData->ebEncParameters.encMode = 1;
     callbackData->ebEncParameters.hierarchicalLevels = 2;
